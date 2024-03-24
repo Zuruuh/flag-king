@@ -1,0 +1,78 @@
+import {
+  createResource,
+  type Component,
+  Suspense,
+  For,
+  createSignal,
+  createEffect,
+} from 'solid-js';
+import { record, string, parseAsync } from 'valibot';
+import { shuffle } from 'remeda';
+import { distance as levenshtein } from 'fastest-levenshtein/mod';
+
+const CountriesSchema = record(string(), string());
+
+const App: Component = () => {
+  const [countries] = createResource(async () => {
+    const response = await fetch('/countries.json');
+    const json = await response.json();
+
+    return parseAsync(CountriesSchema, json).then((countries) =>
+      shuffle(
+        Object.entries(countries)
+          .map(([key, value]) => ({
+            code: key,
+            name: value,
+            normalizedName: value
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/,.*/g, '')
+              .replace(/\(.*\)/g, '')
+              .replace(/-/g, '')
+              .replace(/^iles?/g, '')
+              // .replace(/^sainte?/g, '')
+              .replace(/ du /g, '')
+              .replace(/d'/g, '')
+
+              .replace(/herzegovine/, '')
+
+              .replace(/ /g, ''),
+          }))
+          .filter(
+            ({ code }) =>
+              code.length == 2 && !['eu', 'un', 'gs', 'tf'].includes(code),
+          ),
+      ),
+    );
+  });
+
+  const [input, setInput] = createSignal('');
+  const closest = () => levenshtein(input(), 'France');
+
+  createEffect(() => console.log(closest()));
+  createEffect(() => console.log(countries()));
+
+  return (
+    <>
+      <h1>Hello, World</h1>
+      <Suspense fallback={<span>Loading...</span>}>
+        <input oninput={(e) => setInput(e.target.value)} />
+        <p>closest:</p>
+        {/*
+        <ul>
+          <For each={countries()}>
+            {(item) => (
+              <li>
+                <p>{item.name}</p>
+                <img src={`https://flagcdn.com/${item.code}.svg`} />
+              </li>
+            )}
+          </For>
+        </ul>*/}
+      </Suspense>
+    </>
+  );
+};
+
+export default App;
